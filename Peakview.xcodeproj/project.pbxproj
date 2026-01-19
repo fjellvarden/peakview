@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		63DC471E2F1D7CB50084C9F8 /* Homebase.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Homebase.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		63DC471E2F1D7CB50084C9F8 /* Peakview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Peakview.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		63DC47202F1D7CB50084C9F8 /* Homebase */ = {
+		63DC47202F1D7CB50084C9F8 /* Peakview */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Homebase;
+			path = Peakview;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,7 +32,7 @@
 		63DC47152F1D7CB40084C9F8 = {
 			isa = PBXGroup;
 			children = (
-				63DC47202F1D7CB50084C9F8 /* Homebase */,
+				63DC47202F1D7CB50084C9F8 /* Peakview */,
 				63DC471F2F1D7CB50084C9F8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,7 +40,7 @@
 		63DC471F2F1D7CB50084C9F8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				63DC471E2F1D7CB50084C9F8 /* Homebase.app */,
+				63DC471E2F1D7CB50084C9F8 /* Peakview.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		63DC471D2F1D7CB40084C9F8 /* Homebase */ = {
+		63DC471D2F1D7CB40084C9F8 /* Peakview */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 63DC47292F1D7CB50084C9F8 /* Build configuration list for PBXNativeTarget "Homebase" */;
+			buildConfigurationList = 63DC47292F1D7CB50084C9F8 /* Build configuration list for PBXNativeTarget "Peakview" */;
 			buildPhases = (
 				63DC471A2F1D7CB40084C9F8 /* Sources */,
 				63DC471B2F1D7CB40084C9F8 /* Frameworks */,
@@ -61,13 +61,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				63DC47202F1D7CB50084C9F8 /* Homebase */,
+				63DC47202F1D7CB50084C9F8 /* Peakview */,
 			);
-			name = Homebase;
+			name = Peakview;
 			packageProductDependencies = (
 			);
 			productName = Homebase;
-			productReference = 63DC471E2F1D7CB50084C9F8 /* Homebase.app */;
+			productReference = 63DC471E2F1D7CB50084C9F8 /* Peakview.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 63DC47192F1D7CB40084C9F8 /* Build configuration list for PBXProject "Homebase" */;
+			buildConfigurationList = 63DC47192F1D7CB40084C9F8 /* Build configuration list for PBXProject "Peakview" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				63DC471D2F1D7CB40084C9F8 /* Homebase */,
+				63DC471D2F1D7CB40084C9F8 /* Peakview */,
 			);
 		};
 /* End PBXProject section */
@@ -248,6 +248,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -255,12 +256,15 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Peakview;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = Fjellvarden.Homebase;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -278,6 +282,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -285,12 +290,15 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Peakview;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = Fjellvarden.Homebase;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -306,7 +314,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		63DC47192F1D7CB40084C9F8 /* Build configuration list for PBXProject "Homebase" */ = {
+		63DC47192F1D7CB40084C9F8 /* Build configuration list for PBXProject "Peakview" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				63DC47272F1D7CB50084C9F8 /* Debug */,
@@ -315,7 +323,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		63DC47292F1D7CB50084C9F8 /* Build configuration list for PBXNativeTarget "Homebase" */ = {
+		63DC47292F1D7CB50084C9F8 /* Build configuration list for PBXNativeTarget "Peakview" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				63DC472A2F1D7CB50084C9F8 /* Debug */,
