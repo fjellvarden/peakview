@@ -1,6 +1,6 @@
 //
 //  FolderScanner.swift
-//  Homebase
+//  Peakview
 //
 
 import Foundation
@@ -32,9 +32,9 @@ struct ScannedFolder: Identifiable, Hashable {
 
 class FolderScanner {
     static let shared = FolderScanner()
-    
-    // Enable/disable detailed performance logging
-    static var debugLogging = true
+
+    // Enable/disable detailed performance logging (disabled by default for production)
+    static var debugLogging = false
 
     private init() {}
 

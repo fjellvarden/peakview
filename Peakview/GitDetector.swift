@@ -1,6 +1,6 @@
 //
 //  GitDetector.swift
-//  Homebase
+//  Peakview
 //
 
 import Foundation

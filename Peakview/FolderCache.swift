@@ -1,6 +1,6 @@
 //
 //  FolderCache.swift
-//  Homebase
+//  Peakview
 //
 
 import Foundation
@@ -17,14 +17,23 @@ class FolderCache {
 
     private var cache: [String: FolderCacheEntry] = [:]
     private let cacheFileURL: URL
+    private let lock = NSLock()
 
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let homebaseDir = appSupport.appendingPathComponent("Homebase")
-        cacheFileURL = homebaseDir.appendingPathComponent("folder_cache.json")
+        let peakviewDir = appSupport.appendingPathComponent("Peakview")
+        cacheFileURL = peakviewDir.appendingPathComponent("folder_cache.json")
 
         // Ensure directory exists
-        try? FileManager.default.createDirectory(at: homebaseDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: peakviewDir, withIntermediateDirectories: true)
+
+        // Migrate from old Homebase directory if exists
+        let oldDir = appSupport.appendingPathComponent("Homebase")
+        let oldCacheFile = oldDir.appendingPathComponent("folder_cache.json")
+        if FileManager.default.fileExists(atPath: oldCacheFile.path) &&
+           !FileManager.default.fileExists(atPath: cacheFileURL.path) {
+            try? FileManager.default.copyItem(at: oldCacheFile, to: cacheFileURL)
+        }
 
         loadCache()
     }
@@ -39,6 +48,9 @@ class FolderCache {
     }
 
     func saveCache() {
+        lock.lock()
+        defer { lock.unlock() }
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         encoder.dateEncodingStrategy = .iso8601
@@ -48,6 +60,9 @@ class FolderCache {
     }
 
     func getCachedEntry(for path: String, currentModDate: Date) -> FolderCacheEntry? {
+        lock.lock()
+        defer { lock.unlock() }
+
         guard let entry = cache[path] else {
             return nil
         }
@@ -61,6 +76,9 @@ class FolderCache {
     }
 
     func updateCache(path: String, status: SyncStatus, modDate: Date, remoteUrl: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+
         cache[path] = FolderCacheEntry(
             status: status,
             lastChecked: Date(),

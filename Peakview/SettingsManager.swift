@@ -1,6 +1,6 @@
 //
 //  SettingsManager.swift
-//  Homebase
+//  Peakview
 //
 
 import Foundation
@@ -42,7 +42,7 @@ class SettingsManager {
         for delay in [0.0, 0.05, 0.1, 0.2] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 NSApp.activate(ignoringOtherApps: true)
-                // Find and focus any visible Homebase window
+                // Find and focus any visible Peakview window
                 if let window = NSApp.windows.first(where: {
                     $0.isVisible && $0.level == .normal && $0.canBecomeKey
                 }) {

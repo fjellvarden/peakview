@@ -1,6 +1,6 @@
 //
 //  EditorManager.swift
-//  Homebase
+//  Peakview
 //
 
 import Foundation
@@ -159,9 +159,13 @@ class EditorManager {
     /// Get the editor that would be used for a folder (checking folder-specific settings first)
     func editorForFolder(_ folderPath: String) -> Editor? {
         let folderSettings = FolderSettingsManager.shared.getSettings(for: folderPath)
+        return editorForFolder(with: folderSettings)
+    }
 
+    /// Get the editor for a folder using pre-fetched settings (avoids duplicate lookup)
+    func editorForFolder(with settings: FolderSettings) -> Editor? {
         // Check folder-specific editor first
-        if let editorId = folderSettings.editorId,
+        if let editorId = settings.editorId,
            let editor = allAvailableEditors.first(where: { $0.id == editorId }) {
             return editor
         }

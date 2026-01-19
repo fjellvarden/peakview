@@ -34,6 +34,14 @@ struct ContentView: View {
         return sorted.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
+    private var localFolders: [ScannedFolder] {
+        filteredFolders.filter { $0.syncStatus == .local }
+    }
+
+    private var onlineOnlyFolders: [ScannedFolder] {
+        filteredFolders.filter { $0.syncStatus == .onlineOnly }
+    }
+
     private var filteredUnclonedRepos: [GitHubRepo] {
         if searchText.isEmpty {
             return unclonedRepos
@@ -144,17 +152,62 @@ struct ContentView: View {
 
     private var folderListView: some View {
         List {
-            // Local and online-only folders
-            ForEach(filteredFolders) { folder in
-            let isOnlineOnly = folder.syncStatus == .onlineOnly
-            let folderSettings = folderSettingsManager.getSettings(for: folder.id)
-            let targetEditor = editorManager.editorForFolder(folder.id)
-            let targetTerminal = terminalManager.terminalForFolder(folder.id)
-            let websiteUrls = folderSettings.websiteUrls
-            let isExpanded = expandedUrlsFolder?.id == folder.id
-            let isHovered = hoveredFolderId == folder.id
+            // Local folders
+            ForEach(localFolders) { folder in
+                folderRow(folder)
+            }
 
-            VStack(alignment: .leading, spacing: 0) {
+            // Online-only folders section
+            if !onlineOnlyFolders.isEmpty {
+                Section {
+                    ForEach(onlineOnlyFolders) { folder in
+                        folderRow(folder)
+                    }
+                } header: {
+                    HStack {
+                        Image(systemName: "cloud")
+                        Text("Online Only")
+                            .font(.caption)
+                            .textCase(.uppercase)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            // Uncloned GitHub repos section
+            if !filteredUnclonedRepos.isEmpty {
+                Section {
+                    ForEach(filteredUnclonedRepos) { repo in
+                        unclonedRepoRow(repo)
+                    }
+                } header: {
+                    HStack {
+                        Image("GitHubIcon")
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                        Text("Not Cloned")
+                            .font(.caption)
+                            .textCase(.uppercase)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .sheet(item: $cloneDestinationRepo) { repo in
+            cloneDestinationPicker(for: repo)
+        }
+    }
+
+    private func folderRow(_ folder: ScannedFolder) -> some View {
+        let isOnlineOnly = folder.syncStatus == .onlineOnly
+        let folderSettings = folderSettingsManager.getSettings(for: folder.id)
+        let targetEditor = editorManager.editorForFolder(with: folderSettings)
+        let targetTerminal = terminalManager.terminalForFolder(with: folderSettings)
+        let websiteUrls = folderSettings.websiteUrls
+        let isExpanded = expandedUrlsFolder?.id == folder.id
+        let isHovered = hoveredFolderId == folder.id
+
+        return VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     // Editor icon / gear on hover - clicking opens settings
                     Group {
@@ -302,35 +355,11 @@ struct ContentView: View {
                     .padding(.leading, 28)
                     .padding(.top, 6)
                 }
-            }
-                .padding(.vertical, 4)
-                .opacity(isOnlineOnly ? 0.5 : 1.0)
-                .onHover { hovering in
-                    hoveredFolderId = hovering ? folder.id : nil
-                }
-            }
-
-            // Uncloned GitHub repos section
-            if !filteredUnclonedRepos.isEmpty {
-                Section {
-                    ForEach(filteredUnclonedRepos) { repo in
-                        unclonedRepoRow(repo)
-                    }
-                } header: {
-                    HStack {
-                        Image("GitHubIcon")
-                            .resizable()
-                            .frame(width: 12, height: 12)
-                        Text("Not Cloned")
-                            .font(.caption)
-                            .textCase(.uppercase)
-                    }
-                    .foregroundStyle(.secondary)
-                }
-            }
         }
-        .sheet(item: $cloneDestinationRepo) { repo in
-            cloneDestinationPicker(for: repo)
+        .padding(.vertical, 4)
+        .opacity(isOnlineOnly ? 0.5 : 1.0)
+        .onHover { hovering in
+            hoveredFolderId = hovering ? folder.id : nil
         }
     }
 

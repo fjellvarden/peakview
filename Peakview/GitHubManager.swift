@@ -85,10 +85,14 @@ class GitHubManager {
     var isLoading = false
     var lastError: GitHubError?
 
+    // Index for O(1) repo lookup by fullName (lowercased)
+    private var repoIndex: [String: GitHubRepo] = [:]
+
     private var token: String? {
         didSet {
             if token == nil {
                 username = nil
+                repoIndex = [:]
                 GitHubCache.shared.clearCache()
             }
         }
@@ -98,9 +102,18 @@ class GitHubManager {
         // Load token from Keychain on init
         token = loadTokenFromKeychain()
 
-        // Load cached username
+        // Load cached username and rebuild index
         if token != nil {
             username = GitHubCache.shared.username
+            rebuildRepoIndex()
+        }
+    }
+
+    /// Rebuild the repo index for O(1) lookups
+    private func rebuildRepoIndex() {
+        repoIndex = [:]
+        for repo in GitHubCache.shared.getRepos() {
+            repoIndex[repo.fullName.lowercased()] = repo
         }
     }
 
@@ -294,8 +307,9 @@ class GitHubManager {
             }
         }
 
-        // Update cache
+        // Update cache and rebuild index
         cache.updateRepos(allRepos, etag: newEtag)
+        rebuildRepoIndex()
 
         return allRepos
     }
@@ -310,15 +324,14 @@ class GitHubManager {
 
     // MARK: - Repo Matching
 
-    /// Find a GitHub repo that matches the given remote URL
+    /// Find a GitHub repo that matches the given remote URL (O(1) lookup via index)
     func findMatchingRepo(for remoteUrl: String) -> GitHubRepo? {
         guard let displayName = GitDetector.shared.displayName(from: remoteUrl)?.lowercased() else {
             return nil
         }
 
-        return GitHubCache.shared.getRepos().first { repo in
-            repo.fullName.lowercased() == displayName
-        }
+        // O(1) lookup via index instead of O(n) iteration
+        return repoIndex[displayName]
     }
 
     /// Get repos that are not cloned locally

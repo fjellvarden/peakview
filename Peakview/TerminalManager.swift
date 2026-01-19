@@ -160,9 +160,13 @@ class TerminalManager {
     /// Get the terminal that would be used for a folder (checking folder-specific settings first)
     func terminalForFolder(_ folderPath: String) -> Terminal? {
         let folderSettings = FolderSettingsManager.shared.getSettings(for: folderPath)
+        return terminalForFolder(with: folderSettings)
+    }
 
+    /// Get the terminal for a folder using pre-fetched settings (avoids duplicate lookup)
+    func terminalForFolder(with settings: FolderSettings) -> Terminal? {
         // Check folder-specific terminal first
-        if let terminalId = folderSettings.terminalId,
+        if let terminalId = settings.terminalId,
            let terminal = allAvailableTerminals.first(where: { $0.id == terminalId }) {
             return terminal
         }

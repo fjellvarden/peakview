@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  Homebase
+//  Peakview
 //
 
 import SwiftUI
@@ -46,7 +46,7 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle("Show in Dock", isOn: $settingsManager.showInDock)
-                Text("When disabled, Homebase only appears in the menu bar.")
+                Text("When disabled, Peakview only appears in the menu bar.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

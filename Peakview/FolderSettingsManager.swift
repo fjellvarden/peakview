@@ -1,6 +1,6 @@
 //
 //  FolderSettingsManager.swift
-//  Homebase
+//  Peakview
 //
 
 import Foundation
@@ -67,11 +67,19 @@ class FolderSettingsManager {
 
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let homebaseDir = appSupport.appendingPathComponent("Homebase")
-        settingsFileURL = homebaseDir.appendingPathComponent("folder_settings.json")
+        let peakviewDir = appSupport.appendingPathComponent("Peakview")
+        settingsFileURL = peakviewDir.appendingPathComponent("folder_settings.json")
 
         // Ensure directory exists
-        try? FileManager.default.createDirectory(at: homebaseDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: peakviewDir, withIntermediateDirectories: true)
+
+        // Migrate from old Homebase directory if exists
+        let oldDir = appSupport.appendingPathComponent("Homebase")
+        let oldSettingsFile = oldDir.appendingPathComponent("folder_settings.json")
+        if FileManager.default.fileExists(atPath: oldSettingsFile.path) &&
+           !FileManager.default.fileExists(atPath: settingsFileURL.path) {
+            try? FileManager.default.copyItem(at: oldSettingsFile, to: settingsFileURL)
+        }
 
         loadSettings()
     }
