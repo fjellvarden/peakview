@@ -11,6 +11,7 @@ import AppKit
 struct ContentView: View {
     @State private var settingsManager = SettingsManager.shared
     @State private var editorManager = EditorManager.shared
+    @State private var terminalManager = TerminalManager.shared
     @State private var folderSettingsManager = FolderSettingsManager.shared
     @State private var folders: [ScannedFolder] = []
     @State private var isLoading = false
@@ -128,6 +129,7 @@ struct ContentView: View {
             let folderSettings = folderSettingsManager.getSettings(for: folder.id)
             let hasCustomSettings = !folderSettings.isEmpty
             let targetEditor = editorManager.editorForFolder(folder.id)
+            let targetTerminal = terminalManager.terminalForFolder(folder.id)
             HStack {
                 if isOnlineOnly {
                     Image(systemName: "cloud")
@@ -200,6 +202,22 @@ struct ContentView: View {
                     set: { if !$0 { settingsPopoverFolder = nil } }
                 )) {
                     folderSettingsView(for: folder)
+                }
+                // Terminal button - shows terminal app icon
+                if let terminal = targetTerminal, !isOnlineOnly {
+                    Button {
+                        openInTerminal(folder)
+                    } label: {
+                        if let icon = terminalManager.icon(for: terminal) {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "terminal")
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Open in \(terminal.name)")
                 }
                 Button {
                     FolderScanner.shared.revealInFinder(folder)
@@ -288,6 +306,33 @@ struct ContentView: View {
 
             Divider()
 
+            // Terminal picker
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Terminal")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Picker("", selection: Binding(
+                    get: { currentSettings.terminalId ?? "" },
+                    set: { newValue in
+                        folderSettingsManager.setTerminal(
+                            for: folder.id,
+                            terminalId: newValue.isEmpty ? nil : newValue
+                        )
+                    }
+                )) {
+                    Text("Default").tag("")
+                    Divider()
+                    ForEach(terminalManager.allAvailableTerminals) { terminal in
+                        Text(terminal.name).tag(terminal.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+            }
+
+            Divider()
+
             // Website URL
             VStack(alignment: .leading, spacing: 4) {
                 Text("Website")
@@ -337,6 +382,21 @@ struct ContentView: View {
             WindowManager.closeMainWindow()
         } else if !editorManager.allAvailableEditors.isEmpty {
             editorPickerFolder = folder
+        }
+    }
+
+    private func openInTerminal(_ folder: ScannedFolder) {
+        // Check folder-specific terminal first
+        let folderSettings = folderSettingsManager.getSettings(for: folder.id)
+        if let terminalId = folderSettings.terminalId,
+           let terminal = terminalManager.allAvailableTerminals.first(where: { $0.id == terminalId }) {
+            _ = terminalManager.openFolder(folder.path, with: terminal)
+            return
+        }
+
+        // Fall back to default terminal
+        if let terminal = terminalManager.defaultTerminal {
+            _ = terminalManager.openFolder(folder.path, with: terminal)
         }
     }
 

@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Bindable var settingsManager = SettingsManager.shared
     @State private var editorManager = EditorManager.shared
+    @State private var terminalManager = TerminalManager.shared
 
     var body: some View {
         TabView {
@@ -25,6 +26,11 @@ struct SettingsView: View {
             editorsTab
                 .tabItem {
                     Label("Editors", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+
+            terminalsTab
+                .tabItem {
+                    Label("Terminals", systemImage: "terminal")
                 }
         }
         .frame(width: 450, height: 350)
@@ -158,6 +164,83 @@ struct SettingsView: View {
 
         if panel.runModal() == .OK, let url = panel.url {
             editorManager.addCustomEditor(from: url)
+        }
+    }
+
+    private var terminalsTab: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Default Terminal")
+                .font(.headline)
+
+            Text("Click the terminal icon in the folder list to open that folder in your default terminal.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            List {
+                if terminalManager.allAvailableTerminals.isEmpty {
+                    Text("No terminals detected")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(terminalManager.allAvailableTerminals) { terminal in
+                        HStack {
+                            if let icon = terminalManager.icon(for: terminal) {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .frame(width: 20, height: 20)
+                            } else {
+                                Image(systemName: terminal.isCustom ? "app" : "terminal")
+                                    .foregroundStyle(terminal.id == terminalManager.defaultTerminalId ? .blue : .secondary)
+                                    .frame(width: 20, height: 20)
+                            }
+                            Text(terminal.name)
+                            Spacer()
+                            if terminal.id == terminalManager.defaultTerminalId {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.blue)
+                            }
+                            if terminal.isCustom {
+                                Button {
+                                    terminalManager.removeCustomTerminal(terminal)
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            terminalManager.setDefaultTerminal(terminal)
+                        }
+                    }
+                }
+            }
+            .frame(minHeight: 150)
+
+            HStack {
+                Button("Refresh") {
+                    terminalManager.detectInstalledTerminals()
+                }
+                Spacer()
+                Button("Add App...") {
+                    selectTerminalApp()
+                }
+            }
+        }
+        .padding()
+    }
+
+    private func selectTerminalApp() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.message = "Select a terminal application to add"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            terminalManager.addCustomTerminal(from: url)
         }
     }
 }

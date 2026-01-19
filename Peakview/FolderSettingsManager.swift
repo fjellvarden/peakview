@@ -7,12 +7,12 @@ import Foundation
 
 struct FolderSettings: Codable, Equatable {
     var editorId: String?       // Override default editor for this folder
+    var terminalId: String?     // Override default terminal for this folder
     var websiteUrl: String?     // Custom website URL
     var isHidden: Bool = false  // Hide from main list
-    // Add more settings here as needed
 
     var isEmpty: Bool {
-        editorId == nil && websiteUrl == nil && !isHidden
+        editorId == nil && terminalId == nil && websiteUrl == nil && !isHidden
     }
 }
 
@@ -80,6 +80,12 @@ class FolderSettingsManager {
     func setWebsiteUrl(for folderPath: String, url: String?) {
         updateSettings(for: folderPath) { settings in
             settings.websiteUrl = url
+        }
+    }
+
+    func setTerminal(for folderPath: String, terminalId: String?) {
+        updateSettings(for: folderPath) { settings in
+            settings.terminalId = terminalId
         }
     }
 
