@@ -14,6 +14,13 @@ struct ScannedFolder: Identifiable, Hashable {
     let syncStatus: SyncStatus
     let remoteUrl: String?  // Git remote origin URL
 
+    // GitHub integration fields
+    var linkedGitHubRepoId: Int64?      // Matched GitHub repo ID
+    var linkedGitHubPushedAt: Date?     // Last push date from GitHub
+
+    /// Whether this folder is linked to the user's GitHub account
+    var isLinkedToGitHub: Bool { linkedGitHubRepoId != nil }
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
@@ -120,13 +127,24 @@ class FolderScanner {
                     cache.updateCache(path: path, status: status, modDate: modDate, remoteUrl: remoteUrl)
                 }
 
+                // Check for GitHub link
+                var linkedRepoId: Int64? = nil
+                var linkedPushedAt: Date? = nil
+                if let remoteUrl = remoteUrl,
+                   let matchedRepo = GitHubManager.shared.findMatchingRepo(for: remoteUrl) {
+                    linkedRepoId = matchedRepo.id
+                    linkedPushedAt = matchedRepo.pushedAt
+                }
+
                 folders.append(ScannedFolder(
                     id: path,
                     name: itemURL.lastPathComponent,
                     path: itemURL,
                     modificationDate: modDate,
                     syncStatus: status,
-                    remoteUrl: remoteUrl
+                    remoteUrl: remoteUrl,
+                    linkedGitHubRepoId: linkedRepoId,
+                    linkedGitHubPushedAt: linkedPushedAt
                 ))
             }
 
@@ -169,6 +187,15 @@ class FolderScanner {
             let status = detector.detectSyncStatus(for: folder.path)
             let remoteUrl = gitDetector.detectRemoteUrl(for: folder.path)
 
+            // Check for GitHub link
+            var linkedRepoId: Int64? = nil
+            var linkedPushedAt: Date? = nil
+            if let remoteUrl = remoteUrl,
+               let matchedRepo = GitHubManager.shared.findMatchingRepo(for: remoteUrl) {
+                linkedRepoId = matchedRepo.id
+                linkedPushedAt = matchedRepo.pushedAt
+            }
+
             // Update cache with fresh values
             cache.updateCache(
                 path: folder.path.path,
@@ -178,14 +205,17 @@ class FolderScanner {
             )
 
             // Notify if anything changed
-            if status != folder.syncStatus || remoteUrl != folder.remoteUrl {
+            if status != folder.syncStatus || remoteUrl != folder.remoteUrl ||
+               linkedRepoId != folder.linkedGitHubRepoId {
                 let updated = ScannedFolder(
                     id: folder.id,
                     name: folder.name,
                     path: folder.path,
                     modificationDate: folder.modificationDate,
                     syncStatus: status,
-                    remoteUrl: remoteUrl
+                    remoteUrl: remoteUrl,
+                    linkedGitHubRepoId: linkedRepoId,
+                    linkedGitHubPushedAt: linkedPushedAt
                 )
                 await MainActor.run {
                     onUpdate(updated)

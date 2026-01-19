@@ -63,14 +63,14 @@ class SettingsManager {
 
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let homebaseDir = appSupport.appendingPathComponent("Homebase")
-        settingsFileURL = homebaseDir.appendingPathComponent("watched_folders.json")
+        let peakviewDir = appSupport.appendingPathComponent("Peakview")
+        settingsFileURL = peakviewDir.appendingPathComponent("watched_folders.json")
 
         // Load showInDock setting (default to true)
         self.showInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true
 
         // Ensure directory exists
-        try? FileManager.default.createDirectory(at: homebaseDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: peakviewDir, withIntermediateDirectories: true)
 
         // Load bookmarks
         if let data = try? Data(contentsOf: settingsFileURL),
@@ -78,7 +78,7 @@ class SettingsManager {
             self.bookmarkedFolders = folders
         } else {
             // Try to migrate old paths if they exist
-            let oldFileURL = homebaseDir.appendingPathComponent("watched_paths.json")
+            let oldFileURL = peakviewDir.appendingPathComponent("watched_paths.json")
             if let data = try? Data(contentsOf: oldFileURL),
                let _ = try? JSONDecoder().decode([String].self, from: data) {
                 // Old data exists but can't create bookmarks without URL access

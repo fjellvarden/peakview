@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  Homebase
+//  Peakview
 //
 //  Created by Kristoffer Follestad on 18/01/2026.
 //
@@ -13,12 +13,18 @@ struct ContentView: View {
     @State private var editorManager = EditorManager.shared
     @State private var terminalManager = TerminalManager.shared
     @State private var folderSettingsManager = FolderSettingsManager.shared
+    @State private var gitHubManager = GitHubManager.shared
     @State private var folders: [ScannedFolder] = []
+    @State private var unclonedRepos: [GitHubRepo] = []
     @State private var isLoading = false
     @State private var isRefreshingStatuses = false
     @State private var searchText = ""
     @State private var editorPickerFolder: ScannedFolder?
     @State private var settingsPopoverFolder: ScannedFolder?
+    @State private var expandedUrlsFolder: ScannedFolder?
+    @State private var hoveredFolderId: String?
+    @State private var cloneDestinationRepo: GitHubRepo?
+    @State private var gitRunner = GitCommandRunner.shared
 
     private var filteredFolders: [ScannedFolder] {
         let sorted = FolderScanner.sortFolders(folders)
@@ -26,6 +32,13 @@ struct ContentView: View {
             return sorted
         }
         return sorted.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var filteredUnclonedRepos: [GitHubRepo] {
+        if searchText.isEmpty {
+            return unclonedRepos
+        }
+        return unclonedRepos.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {
@@ -44,6 +57,12 @@ struct ContentView: View {
         .frame(minWidth: 400, minHeight: 300)
         .onAppear { refreshFolders() }
         .onChange(of: settingsManager.watchedPaths) { _, _ in refreshFolders() }
+        .onChange(of: gitHubManager.isConnected) { _, _ in refreshFolders() }
+        .alert("Clone Failed", isPresented: $showCloneError) {
+            Button("OK") { cloneErrorMessage = nil }
+        } message: {
+            Text(cloneErrorMessage ?? "Unknown error")
+        }
     }
 
     private var searchBarView: some View {
@@ -124,112 +143,330 @@ struct ContentView: View {
     }
 
     private var folderListView: some View {
-        List(filteredFolders) { folder in
+        List {
+            // Local and online-only folders
+            ForEach(filteredFolders) { folder in
             let isOnlineOnly = folder.syncStatus == .onlineOnly
             let folderSettings = folderSettingsManager.getSettings(for: folder.id)
-            let hasCustomSettings = !folderSettings.isEmpty
             let targetEditor = editorManager.editorForFolder(folder.id)
             let targetTerminal = terminalManager.terminalForFolder(folder.id)
-            HStack {
-                if isOnlineOnly {
-                    Image(systemName: "cloud")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
-                } else if let editor = targetEditor,
-                          let icon = editorManager.icon(for: editor) {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                } else {
-                    Image(systemName: "folder.fill")
-                        .foregroundStyle(.blue)
-                        .frame(width: 20, height: 20)
-                }
-                VStack(alignment: .leading) {
-                    Text(folder.name)
-                        .fontWeight(.medium)
-                    if let remoteUrl = folder.remoteUrl,
-                       let displayName = GitDetector.shared.displayName(from: remoteUrl) {
-                        Text(displayName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    openInEditor(folder)
-                }
-                .popover(isPresented: Binding(
-                    get: { editorPickerFolder?.id == folder.id },
-                    set: { if !$0 { editorPickerFolder = nil } }
-                )) {
-                    editorPickerView(for: folder)
-                }
-                Spacer()
-                if let websiteUrl = folderSettings.websiteUrl,
-                   let url = URL(string: websiteUrl) {
-                    Button {
-                        NSWorkspace.shared.open(url)
-                    } label: {
-                        Image(systemName: "globe")
-                            .foregroundStyle(.blue)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Open website")
-                }
-                if let remoteUrl = folder.remoteUrl,
-                   let browserUrl = GitDetector.shared.browserUrl(from: remoteUrl) {
-                    Button {
-                        NSWorkspace.shared.open(browserUrl)
-                    } label: {
-                        Image("GitHubIcon")
-                            .resizable()
-                            .frame(width: 14, height: 14)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Open repository on GitHub")
-                }
-                Button {
-                    settingsPopoverFolder = folder
-                } label: {
-                    Image(systemName: hasCustomSettings ? "gearshape.fill" : "gearshape")
-                        .foregroundStyle(hasCustomSettings ? .blue : .secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("Folder settings")
-                .popover(isPresented: Binding(
-                    get: { settingsPopoverFolder?.id == folder.id },
-                    set: { if !$0 { settingsPopoverFolder = nil } }
-                )) {
-                    folderSettingsView(for: folder)
-                }
-                // Terminal button - shows terminal app icon
-                if let terminal = targetTerminal, !isOnlineOnly {
-                    Button {
-                        openInTerminal(folder)
-                    } label: {
-                        if let icon = terminalManager.icon(for: terminal) {
+            let websiteUrls = folderSettings.websiteUrls
+            let isExpanded = expandedUrlsFolder?.id == folder.id
+            let isHovered = hoveredFolderId == folder.id
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    // Editor icon / gear on hover - clicking opens settings
+                    Group {
+                        if isHovered && !isOnlineOnly {
+                            Image(systemName: "gearshape")
+                                .foregroundStyle(.secondary)
+                        } else if isOnlineOnly {
+                            Image(systemName: "cloud")
+                                .foregroundStyle(.secondary)
+                        } else if let editor = targetEditor,
+                                  let icon = editorManager.icon(for: editor) {
                             Image(nsImage: icon)
                                 .resizable()
-                                .frame(width: 14, height: 14)
                         } else {
-                            Image(systemName: "terminal")
+                            Image(systemName: "folder.fill")
+                                .foregroundStyle(.blue)
                         }
                     }
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if !isOnlineOnly {
+                            settingsPopoverFolder = folder
+                        }
+                    }
+                    .popover(isPresented: Binding(
+                        get: { settingsPopoverFolder?.id == folder.id },
+                        set: { if !$0 { settingsPopoverFolder = nil } }
+                    )) {
+                        folderSettingsView(for: folder)
+                    }
+                    VStack(alignment: .leading) {
+                        Text(folder.name)
+                            .fontWeight(.medium)
+                        if let remoteUrl = folder.remoteUrl,
+                           let displayName = GitDetector.shared.displayName(from: remoteUrl) {
+                            HStack(spacing: 4) {
+                                Text(displayName)
+                                if let pushedAt = folder.linkedGitHubPushedAt {
+                                    Text("·")
+                                    Text("Updated \(pushedAt.relativeDescription)")
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        openInEditor(folder)
+                    }
+                    .popover(isPresented: Binding(
+                        get: { editorPickerFolder?.id == folder.id },
+                        set: { if !$0 { editorPickerFolder = nil } }
+                    )) {
+                        editorPickerView(for: folder)
+                    }
+                    Spacer()
+                    // Website button - single URL opens directly, multiple URLs expands list
+                    if websiteUrls.count == 1, let url = URL(string: websiteUrls[0]) {
+                        Button {
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            Image(systemName: "globe")
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Open \(domainName(from: websiteUrls[0]))")
+                    } else if websiteUrls.count > 1 {
+                        Button {
+                            if isExpanded {
+                                expandedUrlsFolder = nil
+                            } else {
+                                expandedUrlsFolder = folder
+                            }
+                        } label: {
+                            Image(systemName: isExpanded ? "link.circle.fill" : "link.circle")
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Show \(websiteUrls.count) websites")
+                    }
+                    if let remoteUrl = folder.remoteUrl,
+                       let browserUrl = GitDetector.shared.browserUrl(from: remoteUrl) {
+                        Button {
+                            NSWorkspace.shared.open(browserUrl)
+                        } label: {
+                            Image("GitHubIcon")
+                                .resizable()
+                                .renderingMode(folder.isLinkedToGitHub ? .template : .original)
+                                .foregroundStyle(folder.isLinkedToGitHub ? .blue : .primary)
+                                .frame(width: 14, height: 14)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(folder.isLinkedToGitHub ? "Open your repository on GitHub" : "Open repository on GitHub")
+                    }
+                    // Terminal button - shows terminal app icon
+                    if let terminal = targetTerminal, !isOnlineOnly {
+                        Button {
+                            openInTerminal(folder)
+                        } label: {
+                            if let icon = terminalManager.icon(for: terminal) {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: "terminal")
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Open in \(terminal.name)")
+                    }
+                    Button {
+                        FolderScanner.shared.revealInFinder(folder)
+                    } label: {
+                        Image(systemName: "folder")
+                    }
                     .buttonStyle(.borderless)
-                    .help("Open in \(terminal.name)")
+                    .help("Reveal in Finder")
                 }
+
+                // Expanded URLs list
+                if isExpanded && websiteUrls.count > 1 {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(Array(websiteUrls.enumerated()), id: \.offset) { index, urlString in
+                            if let url = URL(string: urlString) {
+                                Button {
+                                    NSWorkspace.shared.open(url)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.right")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(domainName(from: urlString))
+                                            .font(.callout)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.blue)
+                            }
+                        }
+                    }
+                    .padding(.leading, 28)
+                    .padding(.top, 6)
+                }
+            }
+                .padding(.vertical, 4)
+                .opacity(isOnlineOnly ? 0.5 : 1.0)
+                .onHover { hovering in
+                    hoveredFolderId = hovering ? folder.id : nil
+                }
+            }
+
+            // Uncloned GitHub repos section
+            if !filteredUnclonedRepos.isEmpty {
+                Section {
+                    ForEach(filteredUnclonedRepos) { repo in
+                        unclonedRepoRow(repo)
+                    }
+                } header: {
+                    HStack {
+                        Image("GitHubIcon")
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                        Text("Not Cloned")
+                            .font(.caption)
+                            .textCase(.uppercase)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .sheet(item: $cloneDestinationRepo) { repo in
+            cloneDestinationPicker(for: repo)
+        }
+    }
+
+    private func unclonedRepoRow(_ repo: GitHubRepo) -> some View {
+        let isCloning = gitRunner.currentCloningRepoId == repo.id
+
+        return HStack {
+            // GitHub icon (gray for uncloned)
+            Image("GitHubIcon")
+                .resizable()
+                .frame(width: 20, height: 20)
+                .opacity(0.5)
+
+            VStack(alignment: .leading) {
+                Text(repo.name)
+                    .fontWeight(.medium)
+                HStack(spacing: 4) {
+                    if isCloning {
+                        Text(gitRunner.cloneProgress)
+                            .lineLimit(1)
+                    } else {
+                        Text(repo.fullName)
+                        if let pushedAt = repo.pushedAt {
+                            Text("·")
+                            Text("Updated \(pushedAt.relativeDescription)")
+                        }
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            // Open on GitHub
+            if let url = URL(string: repo.htmlUrl) {
                 Button {
-                    FolderScanner.shared.revealInFinder(folder)
+                    NSWorkspace.shared.open(url)
                 } label: {
-                    Image(systemName: "folder")
+                    Image("GitHubIcon")
+                        .resizable()
+                        .frame(width: 14, height: 14)
                 }
                 .buttonStyle(.borderless)
-                .help("Reveal in Finder")
+                .help("Open on GitHub")
             }
-            .padding(.vertical, 4)
-            .opacity(isOnlineOnly ? 0.5 : 1.0)
+
+            // Clone button / progress
+            if isCloning {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .frame(width: 60)
+            } else {
+                Button {
+                    if settingsManager.watchedPaths.count == 1 {
+                        cloneRepo(repo, to: settingsManager.watchedPaths[0])
+                    } else if settingsManager.watchedPaths.isEmpty {
+                        print("[ContentView] No watched folders configured")
+                    } else {
+                        cloneDestinationRepo = repo
+                    }
+                } label: {
+                    Label("Clone", systemImage: "square.and.arrow.down")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .disabled(gitRunner.isCloning)
+                .help("Clone repository")
+            }
         }
+        .padding(.vertical, 4)
+        .opacity(isCloning ? 1.0 : 0.6)
+    }
+
+    private func cloneDestinationPicker(for repo: GitHubRepo) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Clone \"\(repo.name)\" to...")
+                .font(.headline)
+
+            Text("This will open Terminal to run the git clone command.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            List(settingsManager.watchedPaths, id: \.self) { path in
+                HStack {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                    Text(path)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button("Clone") {
+                        cloneDestinationRepo = nil
+                        cloneRepo(repo, to: path)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    Button {
+                        GitCommandRunner.shared.copyCloneCommand(repo: repo, to: URL(fileURLWithPath: path))
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Copy clone command to clipboard")
+                }
+                .contentShape(Rectangle())
+            }
+            .frame(minHeight: 120)
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    cloneDestinationRepo = nil
+                }
+            }
+        }
+        .padding()
+        .frame(width: 450, height: 280)
+    }
+
+    /// Extract a readable domain name from a URL string
+    private func domainName(from urlString: String) -> String {
+        guard let url = URL(string: urlString),
+              let host = url.host else {
+            return urlString
+        }
+        // Remove www. prefix and capitalize first letter
+        let domain = host.replacingOccurrences(of: "www.", with: "")
+        // Extract main domain name (e.g., "notion" from "notion.so")
+        let parts = domain.split(separator: ".")
+        if let name = parts.first {
+            return String(name).capitalized
+        }
+        return domain
     }
 
     private func editorPickerView(for folder: ScannedFolder) -> some View {
@@ -333,23 +570,8 @@ struct ContentView: View {
 
             Divider()
 
-            // Website URL
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Website")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                TextField("https://example.com", text: Binding(
-                    get: { currentSettings.websiteUrl ?? "" },
-                    set: { newValue in
-                        folderSettingsManager.setWebsiteUrl(
-                            for: folder.id,
-                            url: newValue.isEmpty ? nil : newValue
-                        )
-                    }
-                ))
-                .textFieldStyle(.roundedBorder)
-            }
+            // Website URLs
+            WebsiteUrlsEditor(folderPath: folder.id)
 
             Divider()
 
@@ -403,6 +625,17 @@ struct ContentView: View {
     private func refreshFolders(forceStatusRefresh: Bool = false) {
         isLoading = true
         Task {
+            // Refresh GitHub repos in background (respects rate limiting)
+            if gitHubManager.isConnected {
+                Task {
+                    do {
+                        _ = try await gitHubManager.fetchRepositories(forceRefresh: forceStatusRefresh)
+                    } catch {
+                        print("[ContentView] GitHub refresh error: \(error.localizedDescription)")
+                    }
+                }
+            }
+
             let scanned = await FolderScanner.shared.scanFolders(in: settingsManager.watchedPaths)
             await MainActor.run {
                 folders = scanned
@@ -411,6 +644,9 @@ struct ContentView: View {
                 // Cleanup orphaned folder settings
                 let existingPaths = Set(scanned.map { $0.id })
                 folderSettingsManager.cleanupOrphanedSettings(existingPaths: existingPaths)
+
+                // Update uncloned repos list
+                updateUnclonedRepos()
             }
 
             // If forced refresh, re-check all statuses in background
@@ -428,9 +664,167 @@ struct ContentView: View {
 
                 await MainActor.run {
                     isRefreshingStatuses = false
+                    updateUnclonedRepos()
                 }
             }
         }
+    }
+
+    private func updateUnclonedRepos() {
+        guard gitHubManager.isConnected else {
+            unclonedRepos = []
+            return
+        }
+
+        // Get all remote URLs from local folders
+        let localRepoFullNames = Set(folders.compactMap { folder -> String? in
+            guard let remoteUrl = folder.remoteUrl else { return nil }
+            return GitDetector.shared.displayName(from: remoteUrl)
+        })
+
+        // Get uncloned repos sorted by pushedAt
+        unclonedRepos = gitHubManager.getUnclonedRepos(localRepoFullNames: localRepoFullNames)
+            .sorted { ($0.pushedAt ?? .distantPast) > ($1.pushedAt ?? .distantPast) }
+    }
+
+    @State private var cloneErrorMessage: String?
+    @State private var showCloneError = false
+
+    private func cloneRepo(_ repo: GitHubRepo, to destinationPath: String) {
+        Task {
+            do {
+                let clonedPath = try await gitRunner.clone(
+                    repo: repo,
+                    to: URL(fileURLWithPath: destinationPath)
+                )
+                await MainActor.run {
+                    refreshFolders()
+                }
+                print("[ContentView] Successfully cloned to: \(clonedPath.path)")
+            } catch {
+                await MainActor.run {
+                    cloneErrorMessage = error.localizedDescription
+                    showCloneError = true
+                }
+                print("[ContentView] Clone failed: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
+// MARK: - Date Extension for Relative Formatting
+
+extension Date {
+    var relativeDescription: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: self, relativeTo: Date())
+    }
+}
+
+// MARK: - Website URLs Editor
+
+struct WebsiteUrlsEditor: View {
+    let folderPath: String
+    @State private var folderSettingsManager = FolderSettingsManager.shared
+    @State private var newUrl: String = ""
+    @State private var isAddingNew: Bool = false
+
+    private var currentUrls: [String] {
+        folderSettingsManager.getSettings(for: folderPath).websiteUrls
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Websites")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                if currentUrls.count < 10 && !isAddingNew {
+                    Button {
+                        isAddingNew = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add website")
+                }
+            }
+
+            // Existing URLs with remove buttons
+            ForEach(Array(currentUrls.enumerated()), id: \.offset) { index, url in
+                HStack(spacing: 4) {
+                    TextField("https://example.com", text: Binding(
+                        get: { url },
+                        set: { newValue in
+                            var urls = currentUrls
+                            urls[index] = newValue
+                            folderSettingsManager.setWebsiteUrls(for: folderPath, urls: urls)
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+
+                    Button {
+                        folderSettingsManager.removeWebsiteUrl(for: folderPath, at: index)
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // New URL field (shown when + is clicked)
+            if isAddingNew {
+                HStack(spacing: 4) {
+                    TextField("https://example.com", text: $newUrl)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit {
+                            commitNewUrl()
+                        }
+
+                    Button {
+                        commitNewUrl()
+                    } label: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(newUrl.isEmpty)
+
+                    Button {
+                        newUrl = ""
+                        isAddingNew = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Show empty field if no URLs yet
+            if currentUrls.isEmpty && !isAddingNew {
+                TextField("https://example.com", text: $newUrl)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        if !newUrl.isEmpty {
+                            folderSettingsManager.addWebsiteUrl(for: folderPath, url: newUrl)
+                            newUrl = ""
+                        }
+                    }
+            }
+        }
+    }
+
+    private func commitNewUrl() {
+        if !newUrl.isEmpty {
+            folderSettingsManager.addWebsiteUrl(for: folderPath, url: newUrl)
+            newUrl = ""
+        }
+        isAddingNew = false
     }
 }
 

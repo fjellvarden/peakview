@@ -1,6 +1,6 @@
 //
-//  HomebaseApp.swift
-//  Homebase
+//  PeakviewApp.swift
+//  Peakview
 //
 //  Created by Kristoffer Follestad on 18/01/2026.
 //
@@ -8,11 +8,11 @@
 import SwiftUI
 
 @main
-struct HomebaseApp: App {
+struct PeakviewApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        Window("Homebase", id: "main") {
+        Window("Peakview", id: "main") {
             ContentView()
         }
 
@@ -54,11 +54,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create right-click menu
         menu = NSMenu()
-        menu?.addItem(NSMenuItem(title: "Open Homebase", action: #selector(openMainWindow), keyEquivalent: "o"))
+        menu?.addItem(NSMenuItem(title: "Open Peakview", action: #selector(openMainWindow), keyEquivalent: "o"))
         menu?.addItem(NSMenuItem.separator())
         menu?.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
         menu?.addItem(NSMenuItem.separator())
-        menu?.addItem(NSMenuItem(title: "Quit Homebase", action: #selector(quitApp), keyEquivalent: "q"))
+        menu?.addItem(NSMenuItem(title: "Quit Peakview", action: #selector(quitApp), keyEquivalent: "q"))
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -79,7 +79,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Find the main window
         let mainWindow = NSApp.windows.first { window in
             window.level == .normal &&
-            window.title == "Homebase" &&
+            window.title == "Peakview" &&
             !window.className.contains("Settings")
         }
 
@@ -100,7 +100,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Find the main content window (normal level, not status bar or settings)
         let mainWindow = NSApp.windows.first { window in
             window.level == .normal &&
-            window.title == "Homebase" &&
+            window.title == "Peakview" &&
             !window.className.contains("Settings")
         }
 
@@ -155,7 +155,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if any main windows are visible
         let hasVisibleMainWindow = NSApp.windows.contains { window in
             window.level == .normal &&
-            window.title == "Homebase" &&
+            window.title == "Peakview" &&
             !window.className.contains("Settings") &&
             window.isVisible
         }
@@ -174,7 +174,7 @@ enum WindowManager {
         DispatchQueue.main.async {
             for window in NSApp.windows {
                 if window.level == .normal &&
-                   window.title == "Homebase" &&
+                   window.title == "Peakview" &&
                    !window.className.contains("Settings") {
                     window.close()
                     // Hide dock icon when closing via WindowManager

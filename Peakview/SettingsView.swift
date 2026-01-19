@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Bindable var settingsManager = SettingsManager.shared
     @State private var editorManager = EditorManager.shared
     @State private var terminalManager = TerminalManager.shared
+    @State private var gitHubManager = GitHubManager.shared
 
     var body: some View {
         TabView {
@@ -32,8 +33,13 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Terminals", systemImage: "terminal")
                 }
+
+            gitHubTab
+                .tabItem {
+                    Label("GitHub", image: "GitHubIcon")
+                }
         }
-        .frame(width: 450, height: 350)
+        .frame(width: 450, height: 380)
     }
 
     private var generalTab: some View {
@@ -228,6 +234,146 @@ struct SettingsView: View {
             }
         }
         .padding()
+    }
+
+    // MARK: - GitHub Tab
+
+    @State private var tokenInput: String = ""
+    @State private var showTokenField: Bool = false
+    @State private var connectionError: String?
+
+    private var gitHubTab: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("GitHub Integration")
+                .font(.headline)
+
+            if gitHubManager.isConnected {
+                // Connected state
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 8, height: 8)
+                    Text("Connected as")
+                        .foregroundStyle(.secondary)
+                    Text("@\(gitHubManager.username ?? "unknown")")
+                        .fontWeight(.medium)
+                }
+
+                Text("Your GitHub repositories will appear in the folder list. Repos not cloned locally can be cloned with one click.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let repoCount = GitHubCache.shared.getRepos().count as Int?, repoCount > 0 {
+                    Text("\(repoCount) repositories synced")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Disconnect") {
+                    gitHubManager.disconnect()
+                    tokenInput = ""
+                    showTokenField = false
+                    connectionError = nil
+                }
+                .foregroundStyle(.red)
+            } else {
+                // Disconnected state
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(.secondary.opacity(0.5))
+                        .frame(width: 8, height: 8)
+                    Text("Not connected")
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Connect your GitHub account to see all your repositories and clone them with one click.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Divider()
+
+                if showTokenField {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Personal Access Token")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        SecureField("ghp_xxxxxxxxxxxxxxxxxxxx", text: $tokenInput)
+                            .textFieldStyle(.roundedBorder)
+
+                        Text("Requires 'repo' scope for private repositories")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let error = connectionError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+
+                        HStack {
+                            Button("Create token on GitHub") {
+                                if let url = URL(string: "https://github.com/settings/tokens/new?scopes=repo&description=Peakview") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                            .buttonStyle(.link)
+
+                            Spacer()
+
+                            Button("Cancel") {
+                                showTokenField = false
+                                tokenInput = ""
+                                connectionError = nil
+                            }
+
+                            Button("Connect") {
+                                connectWithToken()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(tokenInput.isEmpty || gitHubManager.isLoading)
+                        }
+                    }
+                } else {
+                    Spacer()
+
+                    Button("Connect GitHub Account...") {
+                        showTokenField = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                if gitHubManager.isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Connecting...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+
+    private func connectWithToken() {
+        connectionError = nil
+        Task {
+            do {
+                try await gitHubManager.connect(with: tokenInput)
+                await MainActor.run {
+                    tokenInput = ""
+                    showTokenField = false
+                }
+            } catch {
+                await MainActor.run {
+                    connectionError = error.localizedDescription
+                }
+            }
+        }
     }
 
     private func selectTerminalApp() {
